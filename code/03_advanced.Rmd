@@ -4,14 +4,19 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, dev = "CairoPNG")
+options(max.print = 10)
 ```
 
+## Pobranie danych do przykładu:
+
+Na początek pobranie i przekształcenie danych z wykorzystaniem kodu z poprzedniej części:
+
 ```{r}
+# wczytanie potrzebnych pakietów:
+# lubridate przyda się później:
 pacman::p_load(quantmod, xts, lubridate)
-
 data <- getSymbols("^GSPC", auto.assign = FALSE)
-
 class(data) # getSymbols od razu pobiera xts
 
 # Wybranie kolumn OHLC i zmiana nazw kolumn
@@ -23,15 +28,23 @@ data.monthly <- apply.monthly(data, function(x) {
   x <- as.matrix(x)
   c(Open = x[1,1], High = max(x), Low = min(x), Close = x[nrow(x), ncol(x)])
 })
-```
 
-```{r}
+# Pobranie tylko danych close
+# i obliczenie zwrotów logarytmicznych
 close <- data.monthly[, "Close"]
 close <- na.omit(diff(log(close)))
+```
 
-fit <- arima(close, c(1,0,0))
-fit
+## Cel! Budowa modelu ar dla każdego okna o długości `n` 
 
+Najpierw przygotowanie funkcji do budowy modelu:
+
+```{r}
+# Budowa na całych danych:
+fit <- arima(close, order = c(1,0,0))
+fit # Dopasowany model
+
+# Funkcja do zastosowania w rollapply: 
 fitModel <- function(x) {
   arima(x, c(1,0,0))
 }
@@ -40,69 +53,102 @@ fitModel <- function(x) {
 # rollapply(close, align = "right", width = 24, fitModel)
 ```
 
-```{r}
-dt.env <- new.env()
+Niestety wywołanie `rollapply(close, align = "right", width = 24, fitModel)` nie zadziała. `rollapply` działa dobrze w przypadku, gdy wynikiem przekazywanej funkcji jest pojedyncza liczba, w innych przypadkach może być różnie - z reguły - bez sukcesu.
 
+Na szczęście można troszkę oszukać i wykorzystać `rollapply` jedynie do wygodnego tworzenia okien o określonej liczbie elementów, a dopasowane modele zapisywać w innej strukturze. Pora na środowisko.
+
+## Środowisko
+
+Środowisko jest specjalnym obiektem, którego elementy mogą być modyfikowane wewnątrz innych funkcji.
+
+```{r}
+# Tworzenie środowiska i zapisanie do niego elementu x
+dt.env <- new.env()
 dt.env$x <- 10
 
+# Funckja zapisująca w swoim wnętrzy wartość do zmiennej x
 tmpFnc <- function() {
   x <- 20
 }
 
+# Funkcja zapisująca w swoim wnętrzu wartość do x będącego w środowisku dt.env
 envFnc <- function() {
   dt.env$x <- 20
 }
 
-dt.env$x <- 10
-x        <- 10
-
+x <- 10
 tmpFnc()
-x
+x # x jest taki sam
 
 dt.env$x
 envFnc()
-dt.env$x
+dt.env$x # x ze środowiska dt.env został zmodyfikowany!
 ```
 
-# Powrót do xts
+## Powrót do rollapply.
+
+By rozwiązać problem z `rollapply` można wykorzystać środowisko, do którego będą zapisywane zbudowane modele, a sama funkcja będzie zwracać bądź wie co, byleby `rollapply` było szczęśliwe:
 
 ```{r}
+# Przygotowanie środowiska i listy w której
+# będą trzymane zbudowane modele
 result.env <- new.env()
 result.env$result.list <- list()
 
 fitModelEnv <- function(x) {
-
+  
+  # Zapisanie daty ostatniego elementu:
   end.date <- as.character(tail(index(x), 1))
+  
+  # Budowa modelu
   fit <- arima(x, c(1,0,0))
+  
+  # Zapisywanie modelu w liście należącej do 
+  # środowiska result.env. Jako indeks 
+  # wykorzystywana jest data ostatniej obserwacji z okna
   result.env$result.list[[end.date]] <- fit
 
+  # funkcja musi coś zwracać - 1 jest ok!
   return(1)
 }
 
 tmp <- rollapply(close, align = "right", width = 24, fitModelEnv)
 
+# Pobranie listy ze środowiska:
 result.list <- result.env$result.list
 
-x <- result.list[[1]]
-
-summary(x)
-
+# użycie lappy do pobrania współczynnika autoregresji
+# i jego odchylenia standardowego
 coef.list <- lapply(result.list, function(x) {
   c(x$coef[[1]], sqrt(x$var.coef[[1]]))
 })
 
-idx <- lubridate::ymd(names(coef.list))
+# konwersja indeksów na datę wymaganą przez xts
+idx <- ymd(names(coef.list))
+
+# Sklejenie wyników z listy zawierającej 
+# współczynniki w poszczególnych oknach:
 coef.mat <- Reduce(rbind, coef.list)
 coef.xts <- xts(coef.mat, order.by = idx)
+coef.xts
+```
 
+
+
+```{r arplot}
 plot(coef.xts[,1], ylim = c(-1,1))
 lines(coef.xts[,1] - 2 * coef.xts[,2], lwd = 2, col = "red")
 lines(coef.xts[,1] + 2 * coef.xts[,2], lwd = 2, col = "red")
 abline(h = 0, col = "blue", lwd = 2)
 ```
 
+## Cel numer 2! Predykcja.
 
 ```{r}
+# Stworzenie środowiska i dwóch list
+# Pierwsza jak poprzednio służy do zapisywania modelu
+# Druga - do zapisywania prognozy, odchylenia standardowego
+# prognozy i surowej wartości
 result.env <- new.env()
 result.env$result.list <- list()
 result.env$forecast.list <- list()
@@ -110,11 +156,13 @@ result.env$forecast.list <- list()
 predictModelEnv <- function(x) {
 
   end.date <- as.character(tail(index(x), 1))
-
+  
+  # Usunięcie ostatniej obserwacji:
   xx <- head(x, -1)
   fit <- arima(xx, c(1,0,0))
   result.env$result.list[[end.date]] <- fit
 
+  # Predykcja na jeden okres do przodu:
   forecast <- predict(fit, 1)
 
   result.env$forecast.list[[end.date]] <- c(
@@ -125,16 +173,68 @@ predictModelEnv <- function(x) {
   return(1)
 }
 
-tmp <- rollapply(close, align = "right", width = 24, predictModelEnv)
+tmp <- rollapply(close, align = "right", width = 25, predictModelEnv)
 
 forecast.result <- Reduce(rbind, result.env$forecast.list)
 forecast.result <- xts(forecast.result, order.by = lubridate::ymd(names(result.env$forecast.list)))
+```
 
-plot(forecast.result[,3], type = "p", pch = 19)
+```{r forecast}
+plot(forecast.result[,3], type = "p", pch = 19, main = "Forecast vs Observed")
 points(forecast.result[,1], pch = 19, col = "red")
+```
 
+```{r forecast2}
 plot(forecast.result[,3] - forecast.result[,1], pch = 19, type = "p")
 abline(h = 0, col = "red", lty = 2)
 lines(forecast.result[,2] * 2, col = "blue")
 lines(-forecast.result[,2] * 2, col = "blue")
 ```
+
+```{r}
+rmse <- function(x) {
+  sqrt(mean((x[,1] - x[,3])^2))
+}
+
+rmse.24 <- rmse(forecast.result)
+rmse.24
+```
+
+Jeszcze mała zmiana - budowanie modelu od początku danych:
+
+```{r}
+result.env <- new.env()
+result.env$result.list <- list()
+result.env$forecast.list <- list()
+
+predictModelEnv <- function(x) {
+
+  end.date <- as.character(tail(index(x), 1))
+  
+  # Usunięcie ostatniej obserwacji:
+  xx <- head(x, -1)
+  xx <- close[paste0("/", as.character(tail(index(xx), 1)))]
+  
+  fit <- arima(xx, c(1,0,0))
+  result.env$result.list[[end.date]] <- fit
+
+  # Predykcja na jeden okres do przodu:
+  forecast <- predict(fit, 1)
+
+  result.env$forecast.list[[end.date]] <- c(
+    Forecast = forecast$pred[[1]],
+    SE  = forecast$se[[1]],
+    Raw = as.numeric(tail(x,1)))
+
+  return(1)
+}
+
+tmp <- rollapply(close, align = "right", width = 25, predictModelEnv)
+
+forecast.result <- Reduce(rbind, result.env$forecast.list)
+forecast.result <- xts(forecast.result, order.by = lubridate::ymd(names(result.env$forecast.list)))
+
+rmse(forecast.result)
+```
+
+Ostatecznie RMSE modelu estymowanego na 24 ostatnich obserwacjach wyniosło `r round(rmse.24, 3)`, a w przypadku budowy modelu na całej dostępnej historii `r round(rmse(forecast.result), 3)`.
