@@ -4,18 +4,30 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, dev = "CairoPNG")
+options(max.print = 10)
 ```
 
-## xts
+## xts - wprowadzenie:
+
+`xts` jest pakietem udostępniającym bardzo wygodną klasę (o nazwie `xts`!) reprezentującą szereg czasowy:
 
 ```{r}
 library(xts)
 
+# Ukgas - przykładowe dane
+# o klasie `ts`
 class(UKgas)
 
+# xts pozwala na łatwą konwersję wielu klas na typ xts
+# przy pomocy as.xts:
 ukgas <- as.xts(UKgas)
 
+class(ukgas)
+```
+
+Jedną z głównych zalet `xts` jest możliwość bardzo łatwego wybierania określonego zakresu dat:
+```{r}
 ## Pobieranie danych:
 ukgas["1985"] # wybrany rok
 ukgas["1984/1985"] # zakres dat
@@ -24,12 +36,39 @@ ukgas["/1961"] # do daty
 
 gas <- ukgas["1984/1985"]
 
+```
+
+## rollapply
+
+`rollapply` powala na bardzo proste wywołanie wybranej funkcji dla określonego okna:
+
+```{r}
+rollapply(1:5, width = 3, align = "center", sum)
+```
+
+W przypadku obiektu `xts` należy wybrać sposób wyrównania danych:
+
+- `center` - wynik zostanie zwrócony z datą środku przedziału.
+- `left` - wynik zostanie zwrócony z datą początku przedziału.
+- `right` - wynik zostanie zwrócony z datą końca przedziału.
+
+```{r}
 rollapply(gas, width = 3, align = "center", sum)
 rollapply(gas, width = 3, align = "left", sum)
 rollapply(gas, width = 3, align = "right", sum)
 ```
 
-### xta apply
+#### Nawiasem - `rollapplyr`
+
+Z racji, że bardzo często wykorzystywaną wersją `rollapply` jest wersja w której `align = "right"`, została zdefiniowana funkcja `rollapplyr`. Została ona zdefiniowana jako prosty wrapper:
+
+```{r}
+rollapplyr
+```
+
+## xta apply
+
+`xts` udostępnia kilka funkcji postaci `apply.*`, gdzie `*` oznacza wybrany przedział czasowy. Poniżej przykład w którym funkcja sum zostaje wywołana z osobna dla każdego roku:
 
 ```{r}
 ukgas <- as.xts(UKgas)
@@ -37,28 +76,41 @@ apply.yearly(ukgas, sum)
 apply.yearly(ukgas, mean)
 ```
 
-```{r}
-library(quantmod)
+## Przykład - konwersja danych dziennych na miesięczne.
 
+W pracy na szeregach czasowych zdarza się, że zachodzi potrzeba konwersji danych o wyższej częstotliwości do niższej. Na przykład dane dzienne należy zagregować do danych miesięcznych.
+
+W poniższym przykładzie zostanie przedstawiony sposób takiej transformacji z wykorzystaniem pakietu `apply.monthly`.
+
+Pobieranie danych:
+
+```{r}
+# Pakiet quantmod pozwala na łatwe
+# pobieranie danych finansowych z internetu 
+pacman::p_load(quantmod)
 data <- getSymbols("^GSPC", auto.assign = FALSE)
 
-class(data) # getSymbols od razu pobiera xts
+class(data) # getSymbols od razu pobiera xts!
 
 # Wybranie kolumn OHLC i zmiana nazw kolumn
 data <- data[,c(1,2,3,4)] 
 colnames(data) <- c("Open", "High", "Low", "Close")
-
-# Konwersja danych dziennych na miesieczne:
 ```
 
+Po pobraniu danych należy skonstruować funkcję która będzie konwertować dane dzienne do miesięcznych w formacie OHLC (Open, High, Low, Close), z wykorzystaniem funkcji `apply.monthly`:
+
 ```{r}
-# Przygotowanie funkcji dla apply.monthly
+# Przygotowanie funkcji dla apply.monthly.
+# Najlepiej zacząć pracę od próby funkcji na całych danych:
 x <- data
 x[1,1]
 max(x)
 min(x)
 x[nrow(x), ncol(x)]
 
+# x[1,1] i x[nrow(x), ncol(x)] zwracają obiekty 
+# xts których nie da się łatwo połączyć z zwykłymi liczbami 
+# zwracanymi przez min i max
 # Nie działa!
 # c(
 #   x[1,1],
@@ -66,6 +118,8 @@ x[nrow(x), ncol(x)]
 #   min(x),
 #   x[nrow(x), ncol(x)])
 
+# Najprostszym sposobem jest konwersja xts na macierz
+# - wtedy wszystko działa bez problemu:
 x <- as.matrix(x)
 c(
   Open = x[1,1],
@@ -73,7 +127,7 @@ c(
   Low  = min(x),
   Close = x[nrow(x), ncol(x)])
 
-
+# Ostatecznie opakowując w funckję otrzymuje się:
 singleOHLC <- function(x) {
   x <- as.matrix(x)
   c(
@@ -83,20 +137,34 @@ singleOHLC <- function(x) {
     Close = x[nrow(x), ncol(x)])
 }
 
+# Wywołanie dla całych danych:
 singleOHLC(data)
 
 ```
 
 ```{r}
-## Ostatecznie:
-
+# Wykrzystując funckję singleOHLC otrzymuje się
+# dane o szukanej rozdzielczości:
 monthly <- apply.monthly(data, singleOHLC)
+monthly
+```
+
+W pewnych przypadkach, gdy funkcja przekazywana do `apply*` jest bardzo prosta nie ma potrzeby by nawet ją nazywać, wtedy można ją wpisać całą jako argument tak jak w poniższym przykładzie:
+
+```{r}
+# Nie ma problemu by zbudować szereg roczny:
+apply.yearly(data, singleOHLC)
 
 data.monthly <- apply.monthly(data, function(x) {
   x <- as.matrix(x)
   c(Open = x[1,1], High = max(x), Low = min(x), Close = x[nrow(x), ncol(x)])
 })
 
+```
+
+Na koniec można narysować wykres przedstawiający porównanie cen zamknięcia dziennych i miesięcznych na jednym wykresie:
+
+```{r plot}
 plot(data[, "Close"], main = "SP500 daily vs monthly")
 lines(data.monthly[, "Close"], col = "red", lwd = 2)
 ```
