@@ -1,0 +1,52 @@
+---
+title: "xts"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## xts
+
+```{r}
+library(xts)
+
+ukgas <- as.xts(UKgas)
+ukgas["1985"]
+ukgas["1984/1985"]
+ukgas["1984/"]
+ukgas["/1961"]
+
+gas <- ukgas["1984/1985"]
+
+rollapply(gas, width = 3, align = "center", sum)
+rollapply(gas, width = 3, align = "left", sum)
+rollapply(gas, width = 3, align = "right", sum)
+```
+
+### xta apply
+
+```{r}
+ukgas <- as.xts(UKgas)
+apply.yearly(ukgas, sum)
+apply.yearly(ukgas, mean)
+```
+
+```{r}
+library(quantmod)
+index((EuStockMarkets[,1]))
+
+data <- getSymbols("^GSPC", auto.assign = FALSE)
+data <- data[,c(1,2,3,4)]
+colnames(data) <- c("Open", "High", "Low", "Close")
+class(data)
+
+data.monthly <- apply.monthly(data, function(x) {
+  x <- as.matrix(x)
+  c(Open = x[1,1], High = max(x), Low = min(x), Close = x[nrow(x), ncol(x)])
+})
+
+plot(data[, "Close"], main = "SP500 daily vs monthly")
+lines(data.monthly[, "Close"], col = "red", lwd = 2)
+```
