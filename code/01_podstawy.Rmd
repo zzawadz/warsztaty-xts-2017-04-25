@@ -17,12 +17,17 @@ testFnc <- function(x, fnc) {
 x = rnorm(10)
 testFnc(x, mean) == mean(x) * 10
 testFnc(x, sd) == sd(x) * 10
-
 ```
 
 ```{r}
-x <- iris[,1:4]
+x <- iris[, 1:4]
 apply(x, MARGIN = 2, mean)
+
+tapply(X = x[, 1],
+  INDEX = list(iris$Species),
+  FUN = mean)
+
+
 ```
 
 # Zapamiętywanie środowiska

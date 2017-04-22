@@ -12,11 +12,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(xts)
 
+class(UKgas)
+
 ukgas <- as.xts(UKgas)
-ukgas["1985"]
-ukgas["1984/1985"]
-ukgas["1984/"]
-ukgas["/1961"]
+
+## Pobieranie danych:
+ukgas["1985"] # wybrany rok
+ukgas["1984/1985"] # zakres dat
+ukgas["1984/"] # po dacie
+ukgas["/1961"] # do daty
 
 gas <- ukgas["1984/1985"]
 
@@ -35,12 +39,58 @@ apply.yearly(ukgas, mean)
 
 ```{r}
 library(quantmod)
-index((EuStockMarkets[,1]))
 
 data <- getSymbols("^GSPC", auto.assign = FALSE)
-data <- data[,c(1,2,3,4)]
+
+class(data) # getSymbols od razu pobiera xts
+
+# Wybranie kolumn OHLC i zmiana nazw kolumn
+data <- data[,c(1,2,3,4)] 
 colnames(data) <- c("Open", "High", "Low", "Close")
-class(data)
+
+# Konwersja danych dziennych na miesieczne:
+```
+
+```{r}
+# Przygotowanie funkcji dla apply.monthly
+x <- data
+x[1,1]
+max(x)
+min(x)
+x[nrow(x), ncol(x)]
+
+# Nie działa!
+# c(
+#   x[1,1],
+#   max(x),
+#   min(x),
+#   x[nrow(x), ncol(x)])
+
+x <- as.matrix(x)
+c(
+  Open = x[1,1],
+  High = max(x),
+  Low  = min(x),
+  Close = x[nrow(x), ncol(x)])
+
+
+singleOHLC <- function(x) {
+  x <- as.matrix(x)
+  c(
+    Open = x[1,1],
+    High = max(x),
+    Low  = min(x),
+    Close = x[nrow(x), ncol(x)])
+}
+
+singleOHLC(data)
+
+```
+
+```{r}
+## Ostatecznie:
+
+monthly <- apply.monthly(data, singleOHLC)
 
 data.monthly <- apply.monthly(data, function(x) {
   x <- as.matrix(x)
