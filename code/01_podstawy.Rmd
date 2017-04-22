@@ -7,45 +7,87 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Podstawy - przekazywanie funkcji jako argumentu do innej funkcji:
+### Podstawy - przekazywanie funkcji jako argumentu do innej funkcji:
+
+Argumentem przekazywanym do funkcji w R może być dowolny obiekt. A że sama funkcja też jest obiektem oznacza to, że również ona może być użyta w wywołaniu innej funkcji. Przykład:
 
 ```{r}
+# set.seed(123) zapewnia powtarzalność wyników:
+set.seed(123)
+x <- rnorm(10)
+
+# Prosta funkcja biorąca jako argument wektor x i
+# funkcję `fnc`:
 testFnc <- function(x, fnc) {
   fnc(x) * 10
 }
 
-x = rnorm(10)
+# Przykłady wywołania:
 testFnc(x, mean) == mean(x) * 10
 testFnc(x, sd) == sd(x) * 10
 ```
 
+### apply i inne
+
+Mechanizm przekazywania funkcji jako argumenty jest bardzo często wykorzystywany w R. Jednym z głównych przykładów jest rodzina funkcji `apply`:
+
 ```{r}
+# apply:
 x <- iris[, 1:4]
 apply(x, MARGIN = 2, mean)
 
+# tapply:
 tapply(X = x[, 1],
   INDEX = list(iris$Species),
   FUN = mean)
 
-
 ```
 
-# Zapamiętywanie środowiska
+### Funkcja jako wynik działania funckji:
+
+Kodując w R zdarza się, że przydatne są małe funkcje służące jako wrappery pozwalające wywołać inną funkcję z określonymi parametrami. Jednym ze sposobów stworzenia takiej funkcji jest wykorzystanie mechanizmu funkcji jako argumentu: 
 
 ```{r}
+x <- c(1,2,3, NA)
+mean(x) # Jest NA dlatego też wynikiem jest NA
+mean(x, na.rm = TRUE)
+
+# Funckja wywołująca przekazaną funckję `fnc`
+# z argumentem na.rm = TRUE
 withNaRm <- function(x, fnc) {
   fnc(x, na.rm = TRUE)
 }
 
-x <- c(1,2,3, NA)
-mean(x)
-mean(x, na.rm = TRUE)
+# Przykładowe wywołania
 withNaRm(x, mean)
+withNaRm(x, sd)
 ```
+
+Wywołanie `withNaRm(x, mean)` jest jednak mało oczywiste i w zasadzie bardziej zaciemnia kod. Jednak istnieje lepszy mechanizm który może zostać wykorzystany do stworzenia wrapperów - funkcja jako wynik innej funkcji.
+
+Jeżeli funkcja w R jako wynik zwraca inną funkcję, wtedy ta wynikowa funkcja 'pamięta' wszystkie zmienne przekazane i stworzone w funkcji matce:
+
+```{r}
+makePower <- function(pow) {
+  function(x) {
+    message("pow is equal: ", pow)
+    x ^ pow
+  }
+}
+
+square <- makePower(2)
+cube   <- makePower(3)
+
+square(2)
+cube(2)
+```
+
+W efekcie mechanizm ten można wykorzystać do tworzenia wrapperów w następujący sposób:
 
 ```{r}
 makeNaRm <- function(fnc) {
   function(...) {
+    # ... oznacza dowlny argument
     fnc(..., na.rm = TRUE)
   }
 }
@@ -57,4 +99,9 @@ x <- c(1,2,3,NA)
 rmMean(x)
 rmSD(x)
 ```
+
+### Podsumowanie:
+
+- Funkcja może być argumentem dla innej funkcji.
+- Jeżeli funkcja zwraca funkcję, to wynikowa 'pamięta' wszystkie argumenty i zmienne funkcji 'matki'.
 

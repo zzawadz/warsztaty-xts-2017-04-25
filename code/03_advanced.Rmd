@@ -8,6 +8,24 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+pacman::p_load(quantmod, xts, lubridate)
+
+data <- getSymbols("^GSPC", auto.assign = FALSE)
+
+class(data) # getSymbols od razu pobiera xts
+
+# Wybranie kolumn OHLC i zmiana nazw kolumn
+data <- data[,c(1,2,3,4)] 
+colnames(data) <- c("Open", "High", "Low", "Close")
+
+# Konwersja danych dziennych na miesieczne:
+data.monthly <- apply.monthly(data, function(x) {
+  x <- as.matrix(x)
+  c(Open = x[1,1], High = max(x), Low = min(x), Close = x[nrow(x), ncol(x)])
+})
+```
+
+```{r}
 close <- data.monthly[, "Close"]
 close <- na.omit(diff(log(close)))
 
