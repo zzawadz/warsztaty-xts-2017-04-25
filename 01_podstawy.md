@@ -1,4 +1,5 @@
-### Podstawy - przekazywanie funkcji jako argumentu do innej funkcji:
+Podstawy - przekazywanie funkcji jako argumentu do innej funkcji:
+-----------------------------------------------------------------
 
 Argumentem przekazywanym do funkcji w R może być dowolny obiekt. A że
 sama funkcja też jest obiektem oznacza to, że również ona może być użyta
@@ -23,7 +24,8 @@ w wywołaniu innej funkcji. Przykład:
 
     ## [1] TRUE
 
-### apply i inne
+apply i inne
+------------
 
 Mechanizm przekazywania funkcji jako argumenty jest bardzo często
 wykorzystywany w R. Jednym z głównych przykładów jest rodzina funkcji
@@ -44,7 +46,8 @@ wykorzystywany w R. Jednym z głównych przykładów jest rodzina funkcji
     ##     setosa versicolor  virginica 
     ##      5.006      5.936      6.588
 
-### Funkcja jako wynik działania funckji:
+Funkcja jako wynik działania funckji:
+-------------------------------------
 
 Kodując w R zdarza się, że przydatne są małe funkcje służące jako
 wrappery pozwalające wywołać inną funkcję z określonymi parametrami.
@@ -128,7 +131,8 @@ następujący sposób:
 
     ## [1] 1
 
-### Podsumowanie:
+Podsumowanie:
+-------------
 
 -   Funkcja może być argumentem dla innej funkcji.
 -   Jeżeli funkcja zwraca funkcję, to wynikowa 'pamięta' wszystkie

@@ -7,7 +7,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### Podstawy - przekazywanie funkcji jako argumentu do innej funkcji:
+## Podstawy - przekazywanie funkcji jako argumentu do innej funkcji:
 
 Argumentem przekazywanym do funkcji w R może być dowolny obiekt. A że sama funkcja też jest obiektem oznacza to, że również ona może być użyta w wywołaniu innej funkcji. Przykład:
 
@@ -27,7 +27,7 @@ testFnc(x, mean) == mean(x) * 10
 testFnc(x, sd) == sd(x) * 10
 ```
 
-### apply i inne
+## apply i inne
 
 Mechanizm przekazywania funkcji jako argumenty jest bardzo często wykorzystywany w R. Jednym z głównych przykładów jest rodzina funkcji `apply`:
 
@@ -43,7 +43,7 @@ tapply(X = x[, 1],
 
 ```
 
-### Funkcja jako wynik działania funckji:
+## Funkcja jako wynik działania funckji:
 
 Kodując w R zdarza się, że przydatne są małe funkcje służące jako wrappery pozwalające wywołać inną funkcję z określonymi parametrami. Jednym ze sposobów stworzenia takiej funkcji jest wykorzystanie mechanizmu funkcji jako argumentu: 
 
@@ -100,8 +100,7 @@ rmMean(x)
 rmSD(x)
 ```
 
-### Podsumowanie:
+## Podsumowanie:
 
 - Funkcja może być argumentem dla innej funkcji.
 - Jeżeli funkcja zwraca funkcję, to wynikowa 'pamięta' wszystkie argumenty i zmienne funkcji 'matki'.
-
