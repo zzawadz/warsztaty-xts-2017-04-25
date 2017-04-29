@@ -12,3 +12,9 @@ By zainstalować wszystkie potrzebne pakiety najlepiej uruchomić poniższy kod.
 if(!require(pacman)) install.packages("pacman")
 pacman::p_load(xts, lubridate, quantmod, zoo)
 ```
+
+## Dodatkowe materiały:
+
+- https://cran.r-project.org/web/packages/xts/vignettes/xts.pdf - opis pakietu xts - dosyć stary (2008 rok!), ale ciągle aktualny.
+- http://adv-r.had.co.nz/Environments.html - dokładny opis środowisk (`environment`) z książki **Advanced R** (warto przeczytać całą książkę).
+
